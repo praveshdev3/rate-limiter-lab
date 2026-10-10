@@ -8,18 +8,30 @@ import (
 )
 
 type Config struct {
+	Port string
+
 	Algorithm string
 	Limit     int
 	Window    time.Duration
 	Burst     int
+
+	RedisEnabled  bool
+	RedisAddr     string
+	RedisPassword string
+	RedisDB       int
 }
 
 func Load() (Config, error) {
 	cfg := Config{
-		Algorithm: env("ALGORITHM", "fixed_window"),
-		Limit:     1,
-		Window:    time.Minute,
-		Burst:     5,
+		Port:          env("PORT", "8080"),
+		Algorithm:     env("ALGORITHM", "fixed_window"),
+		Limit:         1,
+		Window:        time.Minute,
+		Burst:         5,
+		RedisEnabled:  envBool("REDIS_ENABLED", false),
+		RedisAddr:     env("REDIS_ADDR", "localhost:6379"),
+		RedisPassword: env("REDIS_PASSWORD", ""),
+		RedisDB:       0,
 	}
 
 	var err error
@@ -29,6 +41,10 @@ func Load() (Config, error) {
 	}
 
 	if cfg.Burst, err = envInt("BURST", cfg.Burst); err != nil {
+		return cfg, err
+	}
+
+	if cfg.RedisDB, err = envInt("REDIS_DB", cfg.RedisDB); err != nil {
 		return cfg, err
 	}
 
@@ -62,4 +78,17 @@ func envInt(key string, fallback int) (int, error) {
 		return 0, fmt.Errorf("invalid %s: %w", key, err)
 	}
 	return n, nil
+}
+
+func envBool(key string, fallback bool) bool {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
 }

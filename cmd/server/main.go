@@ -1,8 +1,13 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"log"
 	"net/http"
+	"time"
+
+	"github.com/redis/go-redis/v9"
 
 	"github.com/praveshdev3/rate-limiter-lab/internal/config"
 	"github.com/praveshdev3/rate-limiter-lab/internal/limiter"
@@ -15,7 +20,25 @@ func main() {
 		log.Fatal(err)
 	}
 
-	lim, err := limiter.New(cfg)
+	var rdb *redis.Client
+	if cfg.RedisEnabled {
+		rdb = redis.NewClient(&redis.Options{
+			Addr:     cfg.RedisAddr,
+			Password: cfg.RedisPassword,
+			DB:       cfg.RedisDB,
+		})
+
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		if err := rdb.Ping(ctx).Err(); err != nil {
+			log.Fatalf("failed to connect to redis: %v", err)
+		}
+		defer rdb.Close()
+		log.Printf("redis connected at %s", cfg.RedisAddr)
+	}
+
+	lim, err := limiter.New(cfg, rdb)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -27,8 +50,13 @@ func main() {
 
 	handler := middleware.RateLimit(lim)(mux)
 
-	log.Printf("algorithm=%s limit=%d window=%s burst=%d",
-		cfg.Algorithm, cfg.Limit, cfg.Window, cfg.Burst)
+	port := cfg.Port
+	if port == "" {
+		port = "8080"
+	}
 
-	log.Fatal(http.ListenAndServe(":8080", handler))
+	log.Printf("server starting on :%s | algorithm=%s redis=%t limit=%d window=%s burst=%d",
+		port, cfg.Algorithm, cfg.RedisEnabled, cfg.Limit, cfg.Window, cfg.Burst)
+
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), handler))
 }
