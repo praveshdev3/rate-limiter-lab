@@ -15,6 +15,9 @@ type Config struct {
 	Window    time.Duration
 	Burst     int
 
+	Striped bool
+	Shards  int
+
 	RedisEnabled  bool
 	RedisAddr     string
 	RedisPassword string
@@ -28,6 +31,8 @@ func Load() (Config, error) {
 		Limit:         1,
 		Window:        time.Minute,
 		Burst:         5,
+		Striped:       envBool("STRIPED", false),
+		Shards:        16,
 		RedisEnabled:  envBool("REDIS_ENABLED", false),
 		RedisAddr:     env("REDIS_ADDR", "localhost:6379"),
 		RedisPassword: env("REDIS_PASSWORD", ""),
@@ -44,6 +49,10 @@ func Load() (Config, error) {
 		return cfg, err
 	}
 
+	if cfg.Shards, err = envInt("SHARDS", cfg.Shards); err != nil {
+		return cfg, err
+	}
+
 	if cfg.RedisDB, err = envInt("REDIS_DB", cfg.RedisDB); err != nil {
 		return cfg, err
 	}
@@ -55,6 +64,10 @@ func Load() (Config, error) {
 
 	if cfg.Limit <= 0 || cfg.Window <= 0 || cfg.Burst <= 0 {
 		return cfg, fmt.Errorf("RATE_LIMIT, WINDOW and BURST must be positive")
+	}
+
+	if cfg.Shards <= 0 {
+		return cfg, fmt.Errorf("SHARDS must be positive")
 	}
 
 	return cfg, nil
