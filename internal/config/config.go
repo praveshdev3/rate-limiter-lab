@@ -18,6 +18,8 @@ type Config struct {
 	Striped bool
 	Shards  int
 
+	MaxConcurrent int
+
 	RedisEnabled  bool
 	RedisAddr     string
 	RedisPassword string
@@ -33,6 +35,7 @@ func Load() (Config, error) {
 		Burst:         5,
 		Striped:       envBool("STRIPED", false),
 		Shards:        16,
+		MaxConcurrent: 50,
 		RedisEnabled:  envBool("REDIS_ENABLED", false),
 		RedisAddr:     env("REDIS_ADDR", "localhost:6379"),
 		RedisPassword: env("REDIS_PASSWORD", ""),
@@ -53,6 +56,10 @@ func Load() (Config, error) {
 		return cfg, err
 	}
 
+	if cfg.MaxConcurrent, err = envInt("MAX_CONCURRENT", cfg.MaxConcurrent); err != nil {
+		return cfg, err
+	}
+
 	if cfg.RedisDB, err = envInt("REDIS_DB", cfg.RedisDB); err != nil {
 		return cfg, err
 	}
@@ -68,6 +75,10 @@ func Load() (Config, error) {
 
 	if cfg.Shards <= 0 {
 		return cfg, fmt.Errorf("SHARDS must be positive")
+	}
+
+	if cfg.MaxConcurrent <= 0 {
+		return cfg, fmt.Errorf("MAX_CONCURRENT must be positive")
 	}
 
 	return cfg, nil

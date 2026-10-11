@@ -44,19 +44,28 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
+
 	mux.HandleFunc("/api/demo", func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte("Request allowed\n"))
 	})
 
-	handler := middleware.RateLimit(lim)(mux)
+	mux.HandleFunc("/api/work", func(w http.ResponseWriter, r *http.Request) {
+		// Simulates 150ms of CPU/DB work
+		time.Sleep(150 * time.Millisecond)
+		_, _ = w.Write([]byte("Work completed\n"))
+	})
+
+	var handler http.Handler = mux
+	handler = middleware.RateLimit(lim)(handler)
+	handler = middleware.LoadShed(cfg.MaxConcurrent)(handler)
 
 	port := cfg.Port
 	if port == "" {
 		port = "8080"
 	}
 
-	log.Printf("server starting on :%s | algorithm=%s redis=%t limit=%d window=%s burst=%d",
-		port, cfg.Algorithm, cfg.RedisEnabled, cfg.Limit, cfg.Window, cfg.Burst)
+	log.Printf("server starting on :%s | algo=%s redis=%t striped=%t max_concurrent=%d",
+		port, cfg.Algorithm, cfg.RedisEnabled, cfg.Striped, cfg.MaxConcurrent)
 
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), handler))
 }
